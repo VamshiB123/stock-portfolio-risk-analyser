@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Portfolio Risk Analyser</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #081018;
+      --surface: rgba(11, 20, 31, 0.82);
+      --surface-strong: rgba(17, 29, 43, 0.94);
+      --surface-soft: rgba(26, 41, 58, 0.65);
+      --border: rgba(111, 201, 255, 0.18);
+      --accent: #61d0ff;
+      --accent-strong: #00f0b5;
+      --accent-warm: #ff8c69;
+      --text: #eff7ff;
+      --muted: #8ba1b5;
+      --positive: #00f0b5;
+      --negative: #ff7a8a;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Syne", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(0, 240, 181, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(97, 208, 255, 0.16), transparent 26%),
+        linear-gradient(180deg, #07111a 0%, #0c1622 54%, #081018 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 44px 44px;
+      pointer-events: none;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 90%);
+    }
+
+    .container {
+      width: min(1200px, calc(100vw - 2rem));
+      margin: 0 auto;
+      padding: 2rem 0 3rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      padding: 1.5rem 0 2.5rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .eyebrow,
+    .section-label,
+    label,
+    .hint,
+    .small-note,
+    th,
+    .legend-pill {
+      font-family: "Space Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .eyebrow {
+      font-size: 0.72rem;
+      color: var(--accent);
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+      max-width: 9ch;
+    }
+
+    h1 span {
+      color: var(--accent-strong);
+      display: inline-block;
+    }
+
+    .subtitle {
+      max-width: 62ch;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .panel,
+    .summary-bar,
+    .metric-card,
+    .chart-panel,
+    .table-panel,
+    .matrix-panel {
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .panel {
+      border-radius: 24px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    }
+
+    .panel-header h2,
+    .chart-panel h3,
+    .table-panel h3,
+    .matrix-panel h3 {
+      font-size: 1rem;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .small-note {
+      font-size: 0.68rem;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 32ch;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .field {
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .field-wide {
+      grid-column: span 5;
+    }
+
+    .field-medium {
+      grid-column: span 3;
+    }
+
+    .field-small {
+      grid-column: span 2;
+    }
+
+    label {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    input,
+    select,
+    button {
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--surface-strong);
+      color: var(--text);
+      padding: 0.9rem 1rem;
+      font-size: 0.94rem;
+      outline: none;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    input,
+    select {
+      width: 100%;
+      font-family: "Space Mono", monospace;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: rgba(97, 208, 255, 0.55);
+      box-shadow: 0 0 0 4px rgba(97, 208, 255, 0.09);
+    }
+
+    .analyse-wrap {
+      grid-column: span 2;
+      display: flex;
+      align-items: end;
+    }
+
+    .analyse-btn {
+      width: 100%;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+      color: #051018;
+      border: none;
+      font-weight: 800;
+      font-family: "Syne", sans-serif;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .secondary-btn {
+      width: 100%;
+      cursor: pointer;
+      border: 1px solid rgba(97, 208, 255, 0.22);
+      background: rgba(97, 208, 255, 0.08);
+      color: var(--accent);
+      font-weight: 700;
+      font-family: "Space Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .analyse-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(0, 240, 181, 0.15);
+    }
+
+    .secondary-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(97, 208, 255, 0.42);
+      box-shadow: 0 12px 24px rgba(97, 208, 255, 0.08);
+    }
+
+    .analyse-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .secondary-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    input[type="file"] {
+      padding: 0.72rem 0.9rem;
+    }
+
+    .hint-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .hint,
+    .api-note {
+      font-size: 0.68rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .summary-bar {
+      display: none;
+      border-radius: 18px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-radius: 999px;
+      padding: 0.45rem 0.75rem;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 0.68rem;
+    }
+
+    .legend-pill.warn {
+      color: var(--accent-warm);
+      border: 1px solid rgba(255, 140, 105, 0.22);
+    }
+
+    .loader,
+    .error-box,
+    #results {
+      display: none;
+    }
+
+    .loader,
+    .error-box {
+      border-radius: 18px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      font-family: "Space Mono", monospace;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+    }
+
+    .loader {
+      border: 1px solid rgba(97, 208, 255, 0.2);
+      color: var(--accent);
+      background: rgba(97, 208, 255, 0.08);
+    }
+
+    .error-box {
+      color: var(--negative);
+      background: rgba(255, 122, 138, 0.09);
+      border: 1px solid rgba(255, 122, 138, 0.26);
+    }
+
+    .section-label {
+      margin-bottom: 0.9rem;
+      font-size: 0.68rem;
+      color: var(--accent);
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .metric-card {
+      border-radius: 20px;
+      padding: 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100%;
+      height: 3px;
+      background: var(--accent);
+      opacity: 0.85;
+    }
+
+    .metric-card.positive::before { background: var(--positive); }
+    .metric-card.negative::before { background: var(--negative); }
+    .metric-card.neutral::before { background: var(--accent); }
+
+    .metric-label {
+      font-family: "Space Mono", monospace;
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.6rem;
+    }
+
+    .metric-value {
+      font-size: clamp(1.5rem, 2vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .positive .metric-value,
+    .pos { color: var(--positive); }
+
+    .negative .metric-value,
+    .neg { color: var(--negative); }
+
+    .neutral .metric-value,
+    .neu { color: var(--accent); }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .chart-panel,
+    .table-panel,
+    .matrix-panel,
+    .story-panel,
+    .stock-card {
+      border-radius: 24px;
+      padding: 1.4rem;
+    }
+
+    .chart-panel {
+      min-height: 420px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 320px !important;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 0.85rem 0.9rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 0.84rem;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 400;
+    }
+
+    td {
+      font-family: "Space Mono", monospace;
+      color: var(--text);
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .ticker-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(97, 208, 255, 0.11);
+      color: var(--accent);
+      border: 1px solid rgba(97, 208, 255, 0.18);
+      font-weight: 700;
+    }
+
+    .weight-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .weight-bar {
+      display: inline-block;
+      height: 8px;
+      min-width: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+    }
+
+    .matrix-grid {
+      display: grid;
+      gap: 0.55rem;
+      margin-top: 1rem;
+    }
+
+    .story-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .story-panel h3,
+    .stock-card h4 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .story-overview,
+    .stock-summary,
+    .profile-line {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.92rem;
+    }
+
+    .story-list {
+      margin-top: 0.9rem;
+      display: grid;
+      gap: 0.6rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .story-item {
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .story-item::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.7rem;
+      width: 0.35rem;
+      height: 0.35rem;
+      border-radius: 999px;
+      background: var(--accent-strong);
+    }
+
+    .matrix-row {
+      display: grid;
+      grid-template-columns: 80px repeat(auto-fit, minmax(58px, 1fr));
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .matrix-symbol,
+    .matrix-value {
+      font-family: "Space Mono", monospace;
+      font-size: 0.74rem;
+      padding: 0.6rem 0.5rem;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .matrix-symbol {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+    }
+
+    .matrix-value {
+      color: #041018;
+      font-weight: 700;
+    }
+
+    .stock-insights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .stock-card {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .stock-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.35rem 0.65rem;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-family: "Space Mono", monospace;
+      font-size: 0.66rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    footer {
+      padding-top: 2rem;
+      color: var(--muted);
+      text-align: center;
+      font-family: "Space Mono", monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+    }
+
+    @media (max-width: 980px) {
+      .field-wide,
+      .field-medium,
+      .field-small,
+      .analyse-wrap {
+        grid-column: span 12;
+      }
+
+      .grid-two {
+        grid-template-columns: 1fr;
+      }
+
+      .story-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        width: min(100vw - 1rem, 1200px);
+        padding-top: 1rem;
+      }
+
+      .panel,
+      .chart-panel,
+      .table-panel,
+      .matrix-panel {
+        padding: 1rem;
+        border-radius: 18px;
+      }
+
+      .matrix-row {
+        grid-template-columns: 64px repeat(auto-fit, minmax(52px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="eyebrow">Quantitative Finance Dashboard</div>
+      <h1>Portfolio Risk <span>Made Practical</span></h1>
+      <p class="subtitle">
+        Analyse US and Indian stock baskets with cleaner ticker handling, automatic portfolio optimisation,
+        portfolio metrics, relative performance, and cross-stock correlation.
+      </p>
+    </header>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="section-label">Configure Analysis</div>
+          <h2>Choose your market inputs</h2>
+        </div>
+        <div class="small-note">
+          Use plain symbols with an exchange like <code>NSE</code> or <code>BSE</code>,
+          or pass full Yahoo Finance symbols such as <code>RELIANCE.NS</code>.
+        </div>
+      </div>
+
+      <div class="controls-grid">
+        <div class="field field-wide">
+          <label for="tickers">Tickers</label>
+          <input id="tickers" type="text" value="AAPL, MSFT, GOOGL" placeholder="AAPL, MSFT, RELIANCE.NS" />
+        </div>
+
+        <div class="field field-small">
+          <label for="exchange">Exchange</label>
+          <select id="exchange">
+            <option value="AUTO" selected>Auto</option>
+            <option value="US">US</option>
+            <option value="NSE">NSE</option>
+            <option value="BSE">BSE</option>
+          </select>
+        </div>
+
+        <div class="field field-small">
+          <label for="period">Period</label>
+          <select id="period">
+            <option value="3mo">3 Months</option>
+            <option value="6mo">6 Months</option>
+            <option value="1y" selected>1 Year</option>
+            <option value="2y">2 Years</option>
+            <option value="5y">5 Years</option>
+          </select>
+        </div>
+
+        <div class="field field-small">
+          <label for="riskFreeRate">Risk-Free Rate %</label>
+          <input id="riskFreeRate" type="number" min="0" max="100" step="0.1" value="5" />
+        </div>
+
+        <div class="field field-wide">
+          <label for="screenerCsv">Screener CSV Import</label>
+          <input id="screenerCsv" type="file" accept=".csv,text/csv" />
+        </div>
+
+        <div class="field field-small">
+          <label for="importLimit">Import Limit</label>
+          <input id="importLimit" type="number" min="1" max="100" step="1" value="25" />
+        </div>
+
+        <div class="analyse-wrap">
+          <button class="secondary-btn" id="importCsvBtn" type="button">Import CSV</button>
+        </div>
+
+        <div class="analyse-wrap">
+          <button class="analyse-btn" id="analyseBtn" type="button">Analyse</button>
+        </div>
+      </div>
+
+      <div class="hint-row">
+        <p class="hint">The optimiser now blends price trend, momentum, volatility, volume behaviour, drawdown, and selected yfinance company fields. Example for India: <code>TCS, INFY, RELIANCE</code> with exchange <code>NSE</code>.</p>
+        <p class="api-note" id="apiNote"></p>
+        <p class="api-note" id="importNote">Screener import expects a CSV export containing NSE and/or BSE code columns. Imported weights are ignored.</p>
+      </div>
+    </section>
+
+    <div class="summary-bar" id="summaryBar"></div>
+    <div class="loader" id="loader">FETCHING MARKET DATA, TECHNICALS, AND COMPANY SIGNALS...</div>
+    <div class="error-box" id="errorBox"></div>
+
+    <main id="results">
+      <div class="section-label">Portfolio Snapshot</div>
+      <section class="metrics-grid" id="portfolioMetrics"></section>
+
+      <section class="grid-two">
+        <div class="chart-panel">
+          <h3>Normalised Performance (Base = 100)</h3>
+          <canvas id="priceChart"></canvas>
+        </div>
+
+        <div class="matrix-panel">
+          <h3>Correlation Matrix</h3>
+          <div class="small-note">Closer to 1 means the stocks moved together more consistently during the selected period.</div>
+          <div class="matrix-grid" id="correlationMatrix"></div>
+        </div>
+      </section>
+
+      <section class="story-grid">
+        <article class="story-panel" id="portfolioStory"></article>
+        <article class="story-panel" id="chartSummary"></article>
+      </section>
+
+      <section class="table-panel">
+        <h3>Per-Stock Risk Breakdown</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Model Weight</th>
+              <th>Ann. Return</th>
+              <th>Ann. Volatility</th>
+              <th>Sharpe Ratio</th>
+              <th>Max Drawdown</th>
+              <th>Cumul. Return</th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody"></tbody>
+        </table>
+      </section>
+
+      <section class="stock-insights-grid" id="stockInsights"></section>
+    </main>
+
+    <footer>
+      Stock Portfolio Risk Analyser · Yahoo Finance data via yfinance · Educational use only
+    </footer>
+  </div>
+
+  <script>
+    const COLORS = ["#61d0ff", "#00f0b5", "#ff8c69", "#b28dff", "#ffd166", "#ff5fa2", "#57e2e5", "#95f9c3"];
+    let chart = null;
+
+    function detectApiBase() {
+      const urlOverride = new URLSearchParams(window.location.search).get("api");
+      if (urlOverride) {
+        return urlOverride.replace(/\/$/, "");
+      }
+
+      if (window.location.protocol.startsWith("http")) {
+        const host = window.location.hostname || "127.0.0.1";
+        return `${window.location.protocol}//${host}:5001/api`;
+      }
+
+      return "http://127.0.0.1:5001/api";
+    }
+
+    const API = detectApiBase();
+    document.getElementById("apiNote").textContent = `API endpoint: ${API}`;
+    document.getElementById("analyseBtn").addEventListener("click", analyse);
+    document.getElementById("importCsvBtn").addEventListener("click", importScreenerCsv);
+    document.getElementById("tickers").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        analyse();
+      }
+    });
+
+    async function importScreenerCsv() {
+      const fileInput = document.getElementById("screenerCsv");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        showError("Please choose a Screener CSV file to import.");
+        return;
+      }
+
+      hideError();
+      setLoading(true);
+      setImportNote("Uploading Screener CSV and extracting symbols...");
+
+      const exchange = document.getElementById("exchange").value;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("exchange", exchange === "US" ? "AUTO" : exchange);
+      formData.append("limit", document.getElementById("importLimit").value || "25");
+
+      try {
+        const response = await fetch(`${API}/import/screener`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "CSV import failed");
+        }
+
+        document.getElementById("tickers").value = data.tickers.join(", ");
+        document.getElementById("exchange").value = "AUTO";
+
+        const messages = [
+          `Imported ${data.rows_imported} ${data.rows_imported === 1 ? "stock" : "stocks"}`,
+        ];
+
+        if (data.rows_skipped) {
+          messages.push(`Skipped ${data.rows_skipped} row${data.rows_skipped === 1 ? "" : "s"}`);
+        }
+
+        if (data.detected_exchange) {
+          messages.push(`Detected ${data.detected_exchange}`);
+        }
+
+        if (data.warnings?.length) {
+          messages.push(data.warnings.join(" "));
+        }
+
+        setImportNote(messages.join(" • "));
+      } catch (error) {
+        showError(error.message);
+        setImportNote("Screener CSV import failed.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function analyse() {
+      const tickers = document.getElementById("tickers").value
+        .split(",")
+        .map((ticker) => ticker.trim())
+        .filter(Boolean);
+      const period = document.getElementById("period").value;
+      const exchange = document.getElementById("exchange").value;
+      const riskFreeRate = Number(document.getElementById("riskFreeRate").value || 0);
+
+      if (!tickers.length) {
+        showError("Please enter at least one ticker.");
+        return;
+      }
+
+      hideError();
+      setLoading(true);
+      document.getElementById("results").style.display = "none";
+      document.getElementById("summaryBar").style.display = "none";
+
+      try {
+        const response = await fetch(`${API}/analyse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tickers,
+            period,
+            exchange,
+            risk_free_rate: riskFreeRate,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Unknown API error");
+        }
+
+        renderResults(data);
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderResults(data) {
+      renderSummary(data);
+      renderPortfolioMetrics(data.portfolio_metrics, data.risk_free_rate);
+      renderChart(data.price_history);
+      renderTable(data.stock_metrics, data.weights, data.resolved_tickers);
+      renderCorrelationMatrix(data.correlation_matrix, data.resolved_tickers);
+      renderStory("portfolioStory", data.portfolio_story);
+      renderStory("chartSummary", data.chart_summary);
+      renderStockInsights(data.stock_metrics, data.weights, data.resolved_tickers);
+      document.getElementById("results").style.display = "block";
+    }
+
+    function renderSummary(data) {
+      const summaryBar = document.getElementById("summaryBar");
+      const invalid = data.invalid_tickers.length
+        ? `<span class="legend-pill warn">Skipped: ${data.invalid_tickers.join(", ")}</span>`
+        : "";
+
+      summaryBar.innerHTML = `
+        <span class="legend-pill">Exchange: ${data.exchange}</span>
+        <span class="legend-pill">Period: ${data.period}</span>
+        <span class="legend-pill">Risk-free rate: ${data.risk_free_rate}%</span>
+        <span class="legend-pill">Model: ${formatAllocationModel(data.allocation_model)}</span>
+        <span class="legend-pill">Signal Score: ${formatMetric(data.allocation_model?.weighted_signal_score || 0, 1)}/100</span>
+        <span class="legend-pill">Analysed: ${data.resolved_tickers.join(", ")}</span>
+        ${invalid}
+      `;
+      summaryBar.style.display = "flex";
+    }
+
+    function renderPortfolioMetrics(metrics, riskFreeRate) {
+      const items = [
+        { label: "Annual Return", value: `${formatMetric(metrics.annualised_return)}%`, state: getSignedState(metrics.annualised_return) },
+        { label: "Annual Volatility", value: `${formatMetric(metrics.annualised_volatility)}%`, state: "neutral" },
+        { label: "Sharpe Ratio", value: formatMetric(metrics.sharpe_ratio, 3), state: getSharpeState(metrics.sharpe_ratio) },
+        { label: "Max Drawdown", value: `${formatMetric(metrics.max_drawdown)}%`, state: "negative" },
+        { label: "Cumulative Return", value: `${formatMetric(metrics.cumulative_return)}%`, state: getSignedState(metrics.cumulative_return) },
+        { label: "Risk-Free Rate", value: `${formatMetric(riskFreeRate)}%`, state: "neutral" }
+      ];
+
+      document.getElementById("portfolioMetrics").innerHTML = items.map((item) => `
+        <article class="metric-card ${item.state}">
+          <div class="metric-label">${item.label}</div>
+          <div class="metric-value">${item.value}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderChart(priceHistory) {
+      if (chart) {
+        chart.destroy();
+      }
+
+      const labels = priceHistory.PORTFOLIO?.dates || Object.values(priceHistory)[0]?.dates || [];
+      const datasets = Object.entries(priceHistory).map(([ticker, history], index) => ({
+        label: ticker,
+        data: history.values,
+        borderColor: ticker === "PORTFOLIO" ? "#ffffff" : COLORS[index % COLORS.length],
+        backgroundColor: "transparent",
+        borderDash: ticker === "PORTFOLIO" ? [] : [0],
+        borderWidth: ticker === "PORTFOLIO" ? 3 : 2,
+        pointRadius: 0,
+        tension: 0.28,
+      }));
+
+      chart = new Chart(document.getElementById("priceChart"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#8ba1b5",
+                font: { family: "Space Mono", size: 11 },
+                usePointStyle: true,
+              }
+            },
+            tooltip: {
+              backgroundColor: "#07111a",
+              borderColor: "rgba(97, 208, 255, 0.2)",
+              borderWidth: 1,
+              titleColor: "#61d0ff",
+              bodyColor: "#eff7ff",
+              titleFont: { family: "Space Mono" },
+              bodyFont: { family: "Space Mono" },
+              callbacks: {
+                label: (context) => ` ${context.dataset.label}: ${context.parsed.y.toFixed(2)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: "#8ba1b5",
+                font: { family: "Space Mono", size: 10 },
+                maxTicksLimit: 8,
+              },
+              grid: { color: "rgba(255,255,255,0.05)" }
+            },
+            y: {
+              ticks: {
+                color: "#8ba1b5",
+                font: { family: "Space Mono", size: 10 },
+                callback: (value) => Number(value).toFixed(0),
+              },
+              grid: { color: "rgba(255,255,255,0.05)" }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTable(stockMetrics, weights, tickers) {
+      const rows = tickers.map((ticker) => {
+        const metrics = stockMetrics[ticker] || {};
+        const weight = weights[ticker] || 0;
+
+        if (metrics.error) {
+          return `
+            <tr>
+              <td><span class="ticker-badge">${ticker}</span></td>
+              <td colspan="6" class="neg">${metrics.error}</td>
+            </tr>
+          `;
+        }
+
+        return `
+          <tr>
+            <td><span class="ticker-badge">${ticker}</span></td>
+            <td>
+              <div class="weight-cell">
+                <span class="weight-bar" style="width:${Math.max(weight * 1.4, 10)}px"></span>
+                ${formatMetric(weight)}%
+              </div>
+            </td>
+            <td class="${metrics.annualised_return >= 0 ? "pos" : "neg"}">${formatMetric(metrics.annualised_return)}%</td>
+            <td class="neu">${formatMetric(metrics.annualised_volatility)}%</td>
+            <td class="${getSharpeState(metrics.sharpe_ratio) === "positive" ? "pos" : getSharpeState(metrics.sharpe_ratio) === "negative" ? "neg" : "neu"}">${formatMetric(metrics.sharpe_ratio, 3)}</td>
+            <td class="neg">${formatMetric(metrics.max_drawdown)}%</td>
+            <td class="${metrics.cumulative_return >= 0 ? "pos" : "neg"}">${formatMetric(metrics.cumulative_return)}%</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById("stockTableBody").innerHTML = rows.join("");
+    }
+
+    function renderCorrelationMatrix(matrix, tickers) {
+      const grid = document.getElementById("correlationMatrix");
+      if (!tickers.length) {
+        grid.innerHTML = "<div class='small-note'>No correlation data available.</div>";
+        return;
+      }
+
+      const rows = tickers.map((rowTicker) => {
+        const cells = tickers.map((colTicker) => {
+          const value = Number(matrix?.[rowTicker]?.[colTicker] ?? 0);
+          const background = getCorrelationColor(value);
+          return `<div class="matrix-value" style="background:${background}">${value.toFixed(2)}</div>`;
+        }).join("");
+
+        return `
+          <div class="matrix-row">
+            <div class="matrix-symbol">${rowTicker}</div>
+            ${cells}
+          </div>
+        `;
+      }).join("");
+
+      grid.innerHTML = rows;
+    }
+
+    function renderStory(elementId, story) {
+      const element = document.getElementById(elementId);
+      if (!story) {
+        element.innerHTML = "";
+        return;
+      }
+
+      const bullets = (story.bullets || []).map((bullet) => `
+        <div class="story-item">${bullet}</div>
+      `).join("");
+
+      element.innerHTML = `
+        <h3>${story.headline || "Summary"}</h3>
+        <p class="story-overview">${story.overview || ""}</p>
+        <div class="story-list">${bullets}</div>
+      `;
+    }
+
+    function renderStockInsights(stockMetrics, weights, tickers) {
+      const container = document.getElementById("stockInsights");
+
+      const cards = tickers.map((ticker) => {
+        const metrics = stockMetrics[ticker];
+        if (!metrics || metrics.error) {
+          return "";
+        }
+
+        const profile = metrics.profile || {};
+        const technical = metrics.technical_snapshot || {};
+
+        const profileBits = [
+          profile.sector,
+          profile.industry,
+          profile.market_cap_display ? `Market cap ${profile.market_cap_display}` : "",
+        ].filter(Boolean).join(" · ");
+
+        return `
+          <article class="stock-card">
+            <div class="stock-card-header">
+              <h4>${profile.name || ticker}</h4>
+              <span class="ticker-badge">${ticker}</span>
+            </div>
+            <div class="pill-row">
+              <span class="pill">Weight ${formatMetric(weights[ticker] || 0, 1)}%</span>
+              <span class="pill">Technical ${formatMetric(metrics.technical_score, 1)}</span>
+              <span class="pill">Quality ${formatMetric(metrics.quality_score, 1)}</span>
+              <span class="pill">Selection ${formatMetric(metrics.selection_score, 1)}</span>
+            </div>
+            <p class="profile-line">${profileBits || "Selected mainly from price, volume, and risk signals."}</p>
+            <p class="stock-summary">${metrics.summary || ""}</p>
+            <div class="pill-row">
+              <span class="pill">RSI ${formatMetric(technical.rsi_14, 1)}</span>
+              <span class="pill">MACD ${formatMetric(technical.macd_hist, 2)}</span>
+              <span class="pill">21D ${formatMetric(technical.momentum_21d, 1)}%</span>
+              <span class="pill">63D ${formatMetric(technical.momentum_63d, 1)}%</span>
+              <span class="pill">ADX ${formatMetric(technical.adx_14, 1)}</span>
+              <span class="pill">Vol Ratio ${formatMetric(technical.volume_ratio, 2)}</span>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      container.innerHTML = cards;
+    }
+
+    function getCorrelationColor(value) {
+      const clamped = Math.max(-1, Math.min(1, value));
+      if (clamped >= 0) {
+        const alpha = 0.15 + clamped * 0.45;
+        return `rgba(0, 240, 181, ${alpha.toFixed(2)})`;
+      }
+
+      const alpha = 0.15 + Math.abs(clamped) * 0.45;
+      return `rgba(255, 122, 138, ${alpha.toFixed(2)})`;
+    }
+
+    function getSignedState(value) {
+      return value >= 0 ? "positive" : "negative";
+    }
+
+    function getSharpeState(value) {
+      if (value >= 1) return "positive";
+      if (value < 0) return "negative";
+      return "neutral";
+    }
+
+    function formatMetric(value, decimals = 2) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return "n/a";
+      }
+
+      return Number(value).toFixed(decimals).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+    }
+
+    function setLoading(isLoading) {
+      document.getElementById("loader").style.display = isLoading ? "block" : "none";
+      document.getElementById("analyseBtn").disabled = isLoading;
+      document.getElementById("importCsvBtn").disabled = isLoading;
+    }
+
+    function showError(message) {
+      const errorBox = document.getElementById("errorBox");
+      errorBox.textContent = `ERROR: ${message}`;
+      errorBox.style.display = "block";
+    }
+
+    function hideError() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    function setImportNote(message) {
+      document.getElementById("importNote").textContent = message;
+    }
+
+    function formatAllocationModel(model) {
+      if (!model?.model) {
+        return "Auto";
+      }
+
+      return model.model
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+  </script>
+</body>
+</html>
