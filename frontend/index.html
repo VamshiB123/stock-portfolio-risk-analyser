@@ -211,27 +211,9 @@
       text-transform: uppercase;
     }
 
-    .secondary-btn {
-      width: 100%;
-      cursor: pointer;
-      border: 1px solid rgba(97, 208, 255, 0.22);
-      background: rgba(97, 208, 255, 0.08);
-      color: var(--accent);
-      font-weight: 700;
-      font-family: "Space Mono", monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
     .analyse-btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 14px 28px rgba(0, 240, 181, 0.15);
-    }
-
-    .secondary-btn:hover {
-      transform: translateY(-1px);
-      border-color: rgba(97, 208, 255, 0.42);
-      box-shadow: 0 12px 24px rgba(97, 208, 255, 0.08);
     }
 
     .analyse-btn:disabled {
@@ -239,17 +221,6 @@
       cursor: not-allowed;
       transform: none;
       box-shadow: none;
-    }
-
-    .secondary-btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    input[type="file"] {
-      padding: 0.72rem 0.9rem;
     }
 
     .hint-row {
@@ -650,8 +621,7 @@
         <div class="field field-small">
           <label for="exchange">Exchange</label>
           <select id="exchange">
-            <option value="AUTO" selected>Auto</option>
-            <option value="US">US</option>
+            <option value="US" selected>US</option>
             <option value="NSE">NSE</option>
             <option value="BSE">BSE</option>
           </select>
@@ -673,29 +643,14 @@
           <input id="riskFreeRate" type="number" min="0" max="100" step="0.1" value="5" />
         </div>
 
-        <div class="field field-wide">
-          <label for="screenerCsv">Screener CSV Import</label>
-          <input id="screenerCsv" type="file" accept=".csv,text/csv" />
-        </div>
-
-        <div class="field field-small">
-          <label for="importLimit">Import Limit</label>
-          <input id="importLimit" type="number" min="1" max="100" step="1" value="25" />
-        </div>
-
-        <div class="analyse-wrap">
-          <button class="secondary-btn" id="importCsvBtn" type="button">Import CSV</button>
-        </div>
-
         <div class="analyse-wrap">
           <button class="analyse-btn" id="analyseBtn" type="button">Analyse</button>
         </div>
       </div>
 
       <div class="hint-row">
-        <p class="hint">The optimiser now blends price trend, momentum, volatility, volume behaviour, drawdown, and selected yfinance company fields. Example for India: <code>TCS, INFY, RELIANCE</code> with exchange <code>NSE</code>.</p>
+        <p class="hint">The optimiser now blends price trend, momentum, volatility, volume behaviour, drawdown, and selected yfinance company fields. Example for India: <code>TCS, INFY, RELIANCE</code> with exchange <code>NSE</code>. Example for US: <code>AAPL, MSFT, GOOGL</code>.</p>
         <p class="api-note" id="apiNote"></p>
-        <p class="api-note" id="importNote">Screener import expects a CSV export containing NSE and/or BSE code columns. Imported weights are ignored.</p>
       </div>
     </section>
 
@@ -772,70 +727,11 @@
     const API = detectApiBase();
     document.getElementById("apiNote").textContent = `API endpoint: ${API}`;
     document.getElementById("analyseBtn").addEventListener("click", analyse);
-    document.getElementById("importCsvBtn").addEventListener("click", importScreenerCsv);
     document.getElementById("tickers").addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         analyse();
       }
     });
-
-    async function importScreenerCsv() {
-      const fileInput = document.getElementById("screenerCsv");
-      const file = fileInput.files[0];
-
-      if (!file) {
-        showError("Please choose a Screener CSV file to import.");
-        return;
-      }
-
-      hideError();
-      setLoading(true);
-      setImportNote("Uploading Screener CSV and extracting symbols...");
-
-      const exchange = document.getElementById("exchange").value;
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("exchange", exchange === "US" ? "AUTO" : exchange);
-      formData.append("limit", document.getElementById("importLimit").value || "25");
-
-      try {
-        const response = await fetch(`${API}/import/screener`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || "CSV import failed");
-        }
-
-        document.getElementById("tickers").value = data.tickers.join(", ");
-        document.getElementById("exchange").value = "AUTO";
-
-        const messages = [
-          `Imported ${data.rows_imported} ${data.rows_imported === 1 ? "stock" : "stocks"}`,
-        ];
-
-        if (data.rows_skipped) {
-          messages.push(`Skipped ${data.rows_skipped} row${data.rows_skipped === 1 ? "" : "s"}`);
-        }
-
-        if (data.detected_exchange) {
-          messages.push(`Detected ${data.detected_exchange}`);
-        }
-
-        if (data.warnings?.length) {
-          messages.push(data.warnings.join(" "));
-        }
-
-        setImportNote(messages.join(" • "));
-      } catch (error) {
-        showError(error.message);
-        setImportNote("Screener CSV import failed.");
-      } finally {
-        setLoading(false);
-      }
-    }
 
     async function analyse() {
       const tickers = document.getElementById("tickers").value
@@ -1153,7 +1049,6 @@
     function setLoading(isLoading) {
       document.getElementById("loader").style.display = isLoading ? "block" : "none";
       document.getElementById("analyseBtn").disabled = isLoading;
-      document.getElementById("importCsvBtn").disabled = isLoading;
     }
 
     function showError(message) {
@@ -1164,10 +1059,6 @@
 
     function hideError() {
       document.getElementById("errorBox").style.display = "none";
-    }
-
-    function setImportNote(message) {
-      document.getElementById("importNote").textContent = message;
     }
 
     function formatAllocationModel(model) {

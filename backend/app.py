@@ -1,5 +1,3 @@
-import csv
-import io
 import os
 
 import numpy as np
@@ -14,22 +12,11 @@ CORS(app)
 TRADING_DAYS_PER_YEAR = 252
 DEFAULT_RISK_FREE_RATE = 0.05
 ALLOWED_PERIODS = {"3mo", "6mo", "1y", "2y", "5y"}
-ALLOWED_EXCHANGES = {"AUTO", "US", "NSE", "BSE"}
+ALLOWED_EXCHANGES = {"US", "NSE", "BSE"}
 OPTIMISATION_SAMPLES = 15000
 EXCHANGE_SUFFIXES = {
     "NSE": ".NS",
     "BSE": ".BO",
-}
-NSE_COLUMN_ALIASES = {"nsecode", "nse"}
-BSE_COLUMN_ALIASES = {"bsecode", "bse"}
-NAME_COLUMN_ALIASES = {"name", "company", "companyname"}
-WEIGHT_COLUMN_ALIASES = {
-    "weight",
-    "weights",
-    "allocation",
-    "portfolioallocation",
-    "portfolioweight",
-    "weightage",
 }
 
 
@@ -128,137 +115,6 @@ def normalise_symbol(symbol, exchange):
         return f"{cleaned}{EXCHANGE_SUFFIXES[exchange]}"
 
     return cleaned
-
-
-def normalise_csv_header(header):
-    return "".join(character for character in str(header).strip().lower() if character.isalnum())
-
-
-def parse_csv_limit(raw_limit):
-    if raw_limit in (None, ""):
-        return 25
-
-    try:
-        limit = int(raw_limit)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("CSV import limit must be a whole number") from exc
-
-    if limit < 1 or limit > 100:
-        raise ValueError("CSV import limit must be between 1 and 100")
-
-    return limit
-
-
-def get_first_matching_value(row, aliases):
-    for alias in aliases:
-        value = row.get(alias, "")
-        if value:
-            return value
-    return ""
-
-
-def parse_weight_cell(raw_value):
-    if raw_value in (None, ""):
-        return None
-
-    cleaned = str(raw_value).strip().replace("%", "").replace(",", "")
-    if not cleaned:
-        return None
-
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
-
-
-def resolve_screener_symbol(row, preferred_exchange):
-    nse_symbol = get_first_matching_value(row, NSE_COLUMN_ALIASES)
-    bse_symbol = get_first_matching_value(row, BSE_COLUMN_ALIASES)
-
-    if preferred_exchange == "NSE":
-        return ("NSE", nse_symbol) if nse_symbol else (None, "")
-
-    if preferred_exchange == "BSE":
-        return ("BSE", bse_symbol) if bse_symbol else (None, "")
-
-    if nse_symbol:
-        return "NSE", nse_symbol
-
-    if bse_symbol:
-        return "BSE", bse_symbol
-
-    return None, ""
-
-
-def parse_screener_csv(file_storage, preferred_exchange="AUTO", limit=25):
-    try:
-        raw_bytes = file_storage.read()
-    finally:
-        file_storage.stream.seek(0)
-
-    if not raw_bytes:
-        raise ValueError("Uploaded CSV file is empty")
-
-    csv_text = raw_bytes.decode("utf-8-sig", errors="ignore")
-    reader = csv.DictReader(io.StringIO(csv_text))
-
-    if not reader.fieldnames:
-        raise ValueError("Could not read CSV headers from the uploaded file")
-
-    imported_tickers = []
-    imported_names = []
-    imported_weights = []
-    seen_tickers = set()
-    used_exchanges = set()
-    skipped_rows = 0
-
-    for raw_row in reader:
-        if len(imported_tickers) >= limit:
-            break
-
-        row = {
-            normalise_csv_header(key): str(value).strip()
-            for key, value in raw_row.items()
-            if key is not None
-        }
-
-        if not any(row.values()):
-            continue
-
-        exchange, symbol = resolve_screener_symbol(row, preferred_exchange)
-        if not exchange or not symbol:
-            skipped_rows += 1
-            continue
-
-        ticker = normalise_symbol(symbol, exchange)
-        if ticker in seen_tickers:
-            continue
-
-        seen_tickers.add(ticker)
-        used_exchanges.add(exchange)
-        imported_tickers.append(ticker)
-        imported_names.append(get_first_matching_value(row, NAME_COLUMN_ALIASES) or ticker)
-        imported_weights.append(parse_weight_cell(get_first_matching_value(row, WEIGHT_COLUMN_ALIASES)))
-
-    if not imported_tickers:
-        raise ValueError("Could not find any usable NSE or BSE symbols in this Screener CSV")
-
-    warnings = []
-    if any(weight is not None for weight in imported_weights):
-        warnings.append(
-            "This CSV contains weights, but portfolio allocations will still be chosen automatically by the optimiser."
-        )
-
-    detected_exchange = "MIXED" if len(used_exchanges) > 1 else next(iter(used_exchanges))
-
-    return {
-        "tickers": imported_tickers,
-        "company_names": imported_names,
-        "detected_exchange": detected_exchange,
-        "rows_imported": len(imported_tickers),
-        "rows_skipped": skipped_rows,
-        "warnings": warnings,
-    }
 
 
 def parse_tickers(raw_tickers, exchange):
@@ -1101,42 +957,14 @@ def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/import/screener", methods=["POST"])
-def import_screener_csv():
-    try:
-        upload = request.files.get("file")
-        if upload is None or not upload.filename:
-            return build_error("Please upload a Screener CSV file")
-
-        preferred_exchange = str(request.form.get("exchange", "AUTO")).upper()
-        if preferred_exchange not in {"AUTO", "NSE", "BSE"}:
-            return build_error("CSV import exchange must be one of AUTO, NSE, BSE")
-
-        limit = parse_csv_limit(request.form.get("limit"))
-        imported = parse_screener_csv(upload, preferred_exchange, limit)
-
-        return jsonify(
-            {
-                "source": "screener_csv",
-                "exchange": preferred_exchange,
-                **imported,
-            }
-        )
-    except ValueError as exc:
-        return build_error(str(exc))
-    except Exception as exc:
-        print("CSV Import Error:", exc)
-        return build_error("Unexpected server error while importing CSV", 500)
-
-
 @app.route("/api/analyse", methods=["POST"])
 def analyse():
     try:
         body = request.get_json(silent=True) or {}
 
-        exchange = str(body.get("exchange", "AUTO")).upper()
+        exchange = str(body.get("exchange", "US")).upper()
         if exchange not in ALLOWED_EXCHANGES:
-            return build_error("Exchange must be one of AUTO, US, NSE, BSE")
+            return build_error("Exchange must be one of US, NSE, BSE")
 
         period = str(body.get("period", "1y"))
         if period not in ALLOWED_PERIODS:

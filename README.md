@@ -18,7 +18,6 @@ A full-stack tool to analyse a portfolio of stocks using Yahoo Finance market da
 - Configurable **time period** (3M, 6M, 1Y, 2Y, 5Y)
 - **Exchange-aware ticker handling** for US, NSE, and BSE symbols
 - **Automatic portfolio optimisation** that blends technical strength, quality signals, and risk-adjusted return
-- **Screener CSV import** to load Indian stock baskets from exported screens
 
 ## Project Structure
 
@@ -64,6 +63,7 @@ Then visit `http://localhost:8080`.
 ```json
 {
   "tickers": ["AAPL", "MSFT", "GOOGL"],
+  "exchange": "US",
   "period": "1y",
   "risk_free_rate": 5
 }
@@ -78,20 +78,6 @@ Then visit `http://localhost:8080`.
 - `correlation_matrix` — pairwise return correlations
 - `portfolio_story` — beginner-friendly summary of what the model is seeing
 - `chart_summary` — plain-English explanation of what the chart means
-
-### `POST /api/import/screener`
-
-Upload a Screener CSV export as `multipart/form-data` with:
-
-- `file` — the CSV file
-- `exchange` — optional `AUTO`, `NSE`, or `BSE`
-- `limit` — optional row cap between `1` and `100`
-
-**Response includes:**
-- `tickers` — extracted Yahoo-compatible symbols such as `RELIANCE.NS`
-- `rows_imported` / `rows_skipped` — import summary
-- `detected_exchange` — detected exchange from the CSV rows
-- `warnings` — notes such as imported weight columns being ignored
 
 ## What The Model Uses
 
