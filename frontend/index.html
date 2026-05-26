@@ -505,16 +505,43 @@
       font-weight: 700;
     }
 
+    .stock-insights-section {
+      margin-top: 1.5rem;
+    }
+
+    .stock-insights-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+      flex-wrap: wrap;
+    }
+
     .stock-insights-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 1rem;
-      margin-top: 1.5rem;
     }
 
     .stock-card {
       display: grid;
       gap: 0.85rem;
+      overflow: hidden;
+    }
+
+    .stock-card details {
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .stock-card summary {
+      list-style: none;
+      cursor: pointer;
+    }
+
+    .stock-card summary::-webkit-details-marker {
+      display: none;
     }
 
     .stock-card-header {
@@ -522,6 +549,37 @@
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
+    }
+
+    .stock-card-title {
+      display: grid;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .stock-card h4 {
+      margin-bottom: 0;
+    }
+
+    .stock-teaser {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .stock-card-body {
+      display: grid;
+      gap: 0.85rem;
+      padding-top: 0.15rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .stock-insights-grid.compact .stock-card summary {
+      padding-bottom: 0.25rem;
     }
 
     .pill-row {
@@ -698,7 +756,16 @@
         </table>
       </section>
 
-      <section class="stock-insights-grid" id="stockInsights"></section>
+      <section class="stock-insights-section">
+        <div class="stock-insights-header">
+          <div>
+            <div class="section-label">Stock Insights</div>
+            <h3>Per-stock explanations</h3>
+          </div>
+          <p class="small-note" id="stockInsightsNote">Open a card to see the full explanation and technical snapshot.</p>
+        </div>
+        <div class="stock-insights-grid" id="stockInsights"></div>
+      </section>
     </main>
 
     <footer>
@@ -972,6 +1039,12 @@
 
     function renderStockInsights(stockMetrics, weights, tickers) {
       const container = document.getElementById("stockInsights");
+      const note = document.getElementById("stockInsightsNote");
+      const compactMode = tickers.length >= 3;
+      container.classList.toggle("compact", compactMode);
+      note.textContent = compactMode
+        ? "Showing compact cards for easier scanning. Open a stock to see the full explanation."
+        : "Open a card to see the full explanation and technical snapshot.";
 
       const cards = tickers.map((ticker) => {
         const metrics = stockMetrics[ticker];
@@ -987,29 +1060,40 @@
           profile.industry,
           profile.market_cap_display ? `Market cap ${profile.market_cap_display}` : "",
         ].filter(Boolean).join(" · ");
+        const teaser = buildTeaser(metrics.summary, metrics);
+        const openAttr = compactMode ? "" : "open";
 
         return `
           <article class="stock-card">
-            <div class="stock-card-header">
-              <h4>${profile.name || ticker}</h4>
-              <span class="ticker-badge">${ticker}</span>
-            </div>
-            <div class="pill-row">
-              <span class="pill">Weight ${formatMetric(weights[ticker] || 0, 1)}%</span>
-              <span class="pill">Technical ${formatMetric(metrics.technical_score, 1)}</span>
-              <span class="pill">Quality ${formatMetric(metrics.quality_score, 1)}</span>
-              <span class="pill">Selection ${formatMetric(metrics.selection_score, 1)}</span>
-            </div>
-            <p class="profile-line">${profileBits || "Selected mainly from price, volume, and risk signals."}</p>
-            <p class="stock-summary">${metrics.summary || ""}</p>
-            <div class="pill-row">
-              <span class="pill">RSI ${formatMetric(technical.rsi_14, 1)}</span>
-              <span class="pill">MACD ${formatMetric(technical.macd_hist, 2)}</span>
-              <span class="pill">21D ${formatMetric(technical.momentum_21d, 1)}%</span>
-              <span class="pill">63D ${formatMetric(technical.momentum_63d, 1)}%</span>
-              <span class="pill">ADX ${formatMetric(technical.adx_14, 1)}</span>
-              <span class="pill">Vol Ratio ${formatMetric(technical.volume_ratio, 2)}</span>
-            </div>
+            <details ${openAttr}>
+              <summary>
+                <div class="stock-card-header">
+                  <div class="stock-card-title">
+                    <h4>${profile.name || ticker}</h4>
+                    <p class="stock-teaser">${teaser}</p>
+                  </div>
+                  <span class="ticker-badge">${ticker}</span>
+                </div>
+                <div class="pill-row">
+                  <span class="pill">Weight ${formatMetric(weights[ticker] || 0, 1)}%</span>
+                  <span class="pill">Technical ${formatMetric(metrics.technical_score, 1)}</span>
+                  <span class="pill">Quality ${formatMetric(metrics.quality_score, 1)}</span>
+                  <span class="pill">Selection ${formatMetric(metrics.selection_score, 1)}</span>
+                </div>
+              </summary>
+              <div class="stock-card-body">
+                <p class="profile-line">${profileBits || "Selected mainly from price, volume, and risk signals."}</p>
+                <p class="stock-summary">${metrics.summary || ""}</p>
+                <div class="pill-row">
+                  <span class="pill">RSI ${formatMetric(technical.rsi_14, 1)}</span>
+                  <span class="pill">MACD ${formatMetric(technical.macd_hist, 2)}</span>
+                  <span class="pill">21D ${formatMetric(technical.momentum_21d, 1)}%</span>
+                  <span class="pill">63D ${formatMetric(technical.momentum_63d, 1)}%</span>
+                  <span class="pill">ADX ${formatMetric(technical.adx_14, 1)}</span>
+                  <span class="pill">Vol Ratio ${formatMetric(technical.volume_ratio, 2)}</span>
+                </div>
+              </div>
+            </details>
           </article>
         `;
       }).join("");
@@ -1069,6 +1153,15 @@
       return model.model
         .replaceAll("_", " ")
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function buildTeaser(summary, metrics) {
+      const firstSentence = (summary || "").split(". ")[0]?.trim();
+      if (firstSentence) {
+        return firstSentence.endsWith(".") ? firstSentence : `${firstSentence}.`;
+      }
+
+      return `Selection score ${formatMetric(metrics?.selection_score, 1)} with ${formatMetric(metrics?.annualised_return, 1)}% annual return and ${formatMetric(metrics?.annualised_volatility, 1)}% volatility.`;
     }
   </script>
 </body>
